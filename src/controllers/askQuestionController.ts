@@ -11,18 +11,17 @@ import { db } from "../db";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Helper function to get embeddings
 async function getEmbedding(text: string) {
   const response = await ai.models.embedContent({
     model: "text-embedding-004",
     contents: [text],
     config: { taskType: "SEMANTIC_SIMILARITY" },
   });
-  
+
   if (!response.embeddings || !response.embeddings[0].values) {
     throw new Error("No embeddings returned");
   }
-  
+
   return response.embeddings[0].values;
 }
 
@@ -55,7 +54,11 @@ export const askQuestion = async (req: Request, res: Response) => {
     )})`;
 
     const similarChunks = await db
-      .select({ text: transcriptChunksTable.text, similarity, startTime: transcriptChunksTable.startTime })
+      .select({
+        text: transcriptChunksTable.text,
+        similarity,
+        startTime: transcriptChunksTable.startTime,
+      })
       .from(transcriptChunksTable)
       .where(
         and(
@@ -66,21 +69,18 @@ export const askQuestion = async (req: Request, res: Response) => {
       .orderBy((t) => desc(t.similarity))
       .limit(20);
 
-    console.log(`Found ${similarChunks.length} similar chunks`);
-    
     const context = similarChunks.map((chunk) => chunk.text).join(" ");
-    console.log(`Context length: ${context.length} characters`);
-    
+
     const answerSimilarity = sql<number>`1 - (${cosineDistance(
       questionsTable.answerEmbedding,
       questionEmbedding
     )})`;
 
     const relevantPreviousQA = await db
-      .select({ 
-        question: questionsTable.question, 
+      .select({
+        question: questionsTable.question,
         answer: questionsTable.answer,
-        similarity: answerSimilarity 
+        similarity: answerSimilarity,
       })
       .from(questionsTable)
       .where(
@@ -91,17 +91,14 @@ export const askQuestion = async (req: Request, res: Response) => {
       )
       .orderBy((t) => desc(t.similarity))
       .limit(3);
-    
-    console.log(`Found ${relevantPreviousQA.length} relevant previous Q&As`);
 
-    const previousQAContext = relevantPreviousQA.length > 0 
-      ? `Previous relevant information from our conversation:\n${
-          relevantPreviousQA.map(qa => 
-            `Question: ${qa.question}\nAnswer: ${qa.answer}`
-          ).join('\n\n')
-        }\n\n`
-      : '';
-    
+    const previousQAContext =
+      relevantPreviousQA.length > 0
+        ? `Previous relevant information from our conversation:\n${relevantPreviousQA
+            .map((qa) => `Question: ${qa.question}\nAnswer: ${qa.answer}`)
+            .join("\n\n")}\n\n`
+        : "";
+
     const mostRelevantTimestamp = similarChunks[0]?.startTime ?? 0;
     const prompt = `
       Here is context of the video:
@@ -111,15 +108,13 @@ export const askQuestion = async (req: Request, res: Response) => {
 
       Answer the question and relate it to the video.
     `.trim();
-    
-    console.log("Prompt:", prompt.substring(0, 200) + "...");
-    
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
 
-    let fullAnswer = '';
-    
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    let fullAnswer = "";
+
     try {
       const stream = await ai.models.generateContentStream({
         model: "gemini-2.0-flash",
@@ -149,7 +144,9 @@ export const askQuestion = async (req: Request, res: Response) => {
       res.end();
     } catch (error) {
       console.error("Streaming error:", error);
-      res.write(`data: ${JSON.stringify({ error: "Error during streaming" })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ error: "Error during streaming" })}\n\n`
+      );
       res.end();
     }
   } catch (error) {
