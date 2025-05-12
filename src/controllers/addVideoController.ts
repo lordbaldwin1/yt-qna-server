@@ -32,9 +32,7 @@ export const addVideo = async (req: Request, res: Response) => {
     }).returning();
 
     const chunks = chunkTranscript(transcript);
-    
     await embedChunks(chunks, video[0].id);
-
 
     if (video) {
       return res.status(200).json({ message: "Video added", data: video });
@@ -69,30 +67,31 @@ const chunkTranscript = (transcript: TranscriptResponse[], elementsPerChunk: num
 
 const embedChunks = async (chunks: { text: string; startTime: number; endTime: number }[], videoId: number) => {
   try {
-    const response = await ai.models.embedContent({
-      model: 'text-embedding-004',
-      contents: chunks.map(chunk => chunk.text),
-      config: {
-        taskType: 'SEMANTIC_SIMILARITY',
-      }
-    });
-
-    if (!response.embeddings) {
-      throw new Error("No embeddings returned");
-    }
-
-    if (chunks.length !== response.embeddings.length) {
-      throw new Error("Chunks and embeddings length mismatch");
-    }
-
-    for (let i = 0; i < response.embeddings.length; i++) {
-      await db.insert(transcriptChunksTable).values({
-        videoId: videoId,
-        text: chunks[i].text,
-        startTime: chunks[i].startTime,
-        endTime: chunks[i].endTime,
-        embedding: response.embeddings[i].values ?? [],
+    let processedChunkCount = 0;
+    for (let i = 0; i < chunks.length; i += 100) {
+      const chunkBatch = chunks.slice(i, i + 100);
+      const response = await ai.models.embedContent({
+        model: "text-embedding-004",
+        contents: chunkBatch.map((chunk) => chunk.text),
+        config: {
+          taskType: "SEMANTIC_SIMILARITY",
+        },
       });
+
+      if (!response.embeddings) {
+        throw new Error("No embeddings returned");
+      }
+
+      for (let j = 0; j < response.embeddings.length; j++) {
+        await db.insert(transcriptChunksTable).values({
+          videoId: videoId,
+          text: chunkBatch[j].text,
+          startTime: chunkBatch[j].startTime,
+          endTime: chunkBatch[j].endTime,
+          embedding: response.embeddings[j].values ?? [],
+        });
+      }
+      processedChunkCount += chunkBatch.length;
     }
   } catch (error) {
     console.error(error);

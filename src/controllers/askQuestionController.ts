@@ -61,7 +61,7 @@ export const askQuestion = async (req: Request, res: Response) => {
         )
       )
       .orderBy((t) => desc(t.similarity))
-      .limit(8);
+      .limit(50);
 
     const context = similarChunks.map((chunk) => chunk.text).join(" ");
     const mostRelevantTimestamp = similarChunks[0]?.startTime ?? 0;
@@ -74,36 +74,45 @@ export const askQuestion = async (req: Request, res: Response) => {
       Answer the question based on the context and your knowledge of related topics.
     `.trim();
 
-    const answerResponse = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [prompt],
-    });
+    // SSE implementation for streaming the answer to the client
+    // TODO: Look into changing this to a websocket implementation
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-    const answer = answerResponse.candidates?.[0]?.content ?? "No answer found";
-
-    let answerText = "No answer found";
-    if (
-      typeof answer === "object" &&
-      Array.isArray(answer.parts) &&
-      answer.parts[0]?.text
-    ) {
-      answerText = answer.parts[0].text;
-    } else if (typeof answer === "string") {
-      answerText = answer;
-    }
-
-    await db.insert(questionsTable).values({
-      question,
-      answer: answerText,
-      videoId: numericVideoId,
-      mostRelevantTimestamp,
-      askedAt: new Date(),
-    });
+    let fullAnswer = '';
     
+    try {
+      const stream = await ai.models.generateContentStream({
+        model: "gemini-2.0-flash",
+        contents: [prompt],
+      });
 
-    return res.status(200).json({ answer });
+      for await (const chunk of stream) {
+        const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          fullAnswer += text;
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
+      }
+
+      await db.insert(questionsTable).values({
+        question,
+        answer: fullAnswer,
+        videoId: numericVideoId,
+        mostRelevantTimestamp,
+        askedAt: new Date(),
+      });
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("Streaming error:", error);
+      res.write(`data: ${JSON.stringify({ error: "Error during streaming" })}\n\n`);
+      res.end();
+    }
   } catch (error) {
     console.error("askQuestion error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 };

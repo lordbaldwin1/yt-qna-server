@@ -1,5 +1,5 @@
 import express from 'express';
-import type { Request, Response } from 'express';
+import cors from 'cors';
 
 import dotenv from 'dotenv';
 import routes from './routes';
@@ -10,6 +10,9 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use("/api", routes);
+app.use(cors({
+  origin: `${process.env.FRONTEND_URL}`
+}));
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
