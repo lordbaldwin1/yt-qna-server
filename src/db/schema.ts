@@ -30,4 +30,7 @@ export const questionsTable = pgTable("questions", {
   videoId: integer().references(() => videosTable.id),
   mostRelevantTimestamp: doublePrecision(),
   askedAt: timestamp("asked_at").defaultNow().notNull(),
-});
+  answerEmbedding: vector("answer_embedding", { dimensions: 768 }),
+}, (t) => [
+  index("answerEmbeddingIndex").using("hnsw", t.answerEmbedding.op("vector_cosine_ops"))
+]);

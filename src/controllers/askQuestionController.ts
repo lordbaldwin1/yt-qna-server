@@ -11,6 +11,21 @@ import { db } from "../db";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Helper function to get embeddings
+async function getEmbedding(text: string) {
+  const response = await ai.models.embedContent({
+    model: "text-embedding-004",
+    contents: [text],
+    config: { taskType: "SEMANTIC_SIMILARITY" },
+  });
+  
+  if (!response.embeddings || !response.embeddings[0].values) {
+    throw new Error("No embeddings returned");
+  }
+  
+  return response.embeddings[0].values;
+}
+
 export const askQuestion = async (req: Request, res: Response) => {
   try {
     const { question, videoId } = req.body;
@@ -32,19 +47,7 @@ export const askQuestion = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Video not found" });
     }
 
-    const response = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: [question],
-      config: { taskType: "SEMANTIC_SIMILARITY" },
-    });
-    if (!response.embeddings) {
-      return res.status(400).json({ error: "No embeddings returned" });
-    }
-    const questionEmbedding = response.embeddings[0].values;
-
-    if (!questionEmbedding) {
-      return res.status(400).json({ error: "No question embedding returned" });
-    }
+    const questionEmbedding = await getEmbedding(question);
 
     const similarity = sql<number>`1 - (${cosineDistance(
       transcriptChunksTable.embedding,
@@ -61,21 +64,56 @@ export const askQuestion = async (req: Request, res: Response) => {
         )
       )
       .orderBy((t) => desc(t.similarity))
-      .limit(50);
+      .limit(20);
 
+    console.log(`Found ${similarChunks.length} similar chunks`);
+    
     const context = similarChunks.map((chunk) => chunk.text).join(" ");
+    console.log(`Context length: ${context.length} characters`);
+    
+    const answerSimilarity = sql<number>`1 - (${cosineDistance(
+      questionsTable.answerEmbedding,
+      questionEmbedding
+    )})`;
+
+    const relevantPreviousQA = await db
+      .select({ 
+        question: questionsTable.question, 
+        answer: questionsTable.answer,
+        similarity: answerSimilarity 
+      })
+      .from(questionsTable)
+      .where(
+        and(
+          gt(answerSimilarity, 0.6),
+          eq(questionsTable.videoId, numericVideoId)
+        )
+      )
+      .orderBy((t) => desc(t.similarity))
+      .limit(3);
+    
+    console.log(`Found ${relevantPreviousQA.length} relevant previous Q&As`);
+
+    const previousQAContext = relevantPreviousQA.length > 0 
+      ? `Previous relevant information from our conversation:\n${
+          relevantPreviousQA.map(qa => 
+            `Question: ${qa.question}\nAnswer: ${qa.answer}`
+          ).join('\n\n')
+        }\n\n`
+      : '';
+    
     const mostRelevantTimestamp = similarChunks[0]?.startTime ?? 0;
     const prompt = `
-      You are a helpful assistant that can answer questions about the video with the following context:
+      Here is context of the video:
       ${context}
 
-      Question: ${question}
+      ${previousQAContext}Question: ${question}
 
-      Answer the question based on the context and your knowledge of related topics.
+      Answer the question and relate it to the video.
     `.trim();
-
-    // SSE implementation for streaming the answer to the client
-    // TODO: Look into changing this to a websocket implementation
+    
+    console.log("Prompt:", prompt.substring(0, 200) + "...");
+    
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -96,12 +134,15 @@ export const askQuestion = async (req: Request, res: Response) => {
         }
       }
 
+      const answerEmbedding = await getEmbedding(fullAnswer);
+
       await db.insert(questionsTable).values({
         question,
         answer: fullAnswer,
         videoId: numericVideoId,
         mostRelevantTimestamp,
         askedAt: new Date(),
+        answerEmbedding: answerEmbedding,
       });
 
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
