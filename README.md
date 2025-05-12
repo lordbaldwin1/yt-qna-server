@@ -1,4 +1,4 @@
-# YouTube Q&A Backend
+# yt-qna-server
 
 This backend allows users to upload YouTube video URLs, fetches and stores video metadata and transcripts, generates embeddings for transcript chunks, and enables users to ask questions about the video content using semantic search and Gemini AI.
 
