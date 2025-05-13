@@ -4,7 +4,7 @@ import { transcriptChunksTable, videosTable } from "../db/schema";
 import { YoutubeTranscript, type TranscriptResponse } from 'youtube-transcript';
 import { GoogleGenAI } from "@google/genai";
 import "dotenv/config";
-
+import { eq } from "drizzle-orm";
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const addVideo = async (req: Request, res: Response) => {
@@ -15,6 +15,14 @@ export const addVideo = async (req: Request, res: Response) => {
   }
 
   const videoId = extractYoutubeVideoId(url);
+
+  const duplicateVideo = await db.query.videosTable.findFirst({
+    where: eq(videosTable.youtubeVideoId, videoId),
+  });
+
+  if (duplicateVideo) {
+    return res.status(400).json({ error: "Video already exists" });
+  }
 
   try {
     const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${process.env.YOUTUBE_API_KEY}&part=snippet,contentDetails`);
