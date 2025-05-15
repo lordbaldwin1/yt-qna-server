@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { WebSocket } from "ws";
 import { GoogleGenAI } from "@google/genai";
 import "dotenv/config";
 import { cosineDistance, sql, gt, desc, eq, and } from "drizzle-orm";
@@ -25,25 +25,37 @@ async function getEmbedding(text: string) {
   return response.embeddings[0].values;
 }
 
-export const askQuestion = async (req: Request, res: Response) => {
+export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
   try {
-    const { question, videoId } = req.body;
+    const { question, videoId } = message;
 
     if (!question || !videoId) {
-      return res
-        .status(400)
-        .json({ error: "Question and videoId are required" });
+      ws.send(JSON.stringify({ 
+        type: "error", 
+        error: "Question and videoId are required" 
+      }));
+      return;
     }
 
     const numericVideoId = Number(videoId);
     if (isNaN(numericVideoId)) {
-      return res.status(400).json({ error: "Invalid videoId" });
+      ws.send(JSON.stringify({ 
+        type: "error", 
+        error: "Invalid videoId" 
+      }));
+      return;
     }
+    
     const video = await db.query.videosTable.findFirst({
       where: (videos, { eq }) => eq(videos.id, numericVideoId),
     });
+    
     if (!video) {
-      return res.status(404).json({ error: "Video not found" });
+      ws.send(JSON.stringify({ 
+        type: "error", 
+        error: "Video not found" 
+      }));
+      return;
     }
 
     const questionEmbedding = await getEmbedding(question);
@@ -109,13 +121,15 @@ export const askQuestion = async (req: Request, res: Response) => {
       Answer the question and relate it to the video.
     `.trim();
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
     let fullAnswer = "";
 
     try {
+      // Send a message indicating the AI is processing
+      ws.send(JSON.stringify({ 
+        type: "processing",
+        message: "Processing your question..."
+      }));
+
       const stream = await ai.models.generateContentStream({
         model: "gemini-2.0-flash",
         contents: [prompt],
@@ -125,7 +139,11 @@ export const askQuestion = async (req: Request, res: Response) => {
         const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           fullAnswer += text;
-          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          ws.send(JSON.stringify({ 
+            type: "chunk", 
+            text,
+            timestamp: new Date().toISOString()
+          }));
         }
       }
 
@@ -140,17 +158,23 @@ export const askQuestion = async (req: Request, res: Response) => {
         answerEmbedding: answerEmbedding,
       });
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
+      ws.send(JSON.stringify({ 
+        type: "complete", 
+        timestamp: mostRelevantTimestamp,
+        message: "Answer complete"
+      }));
     } catch (error) {
       console.error("Streaming error:", error);
-      res.write(
-        `data: ${JSON.stringify({ error: "Error during streaming" })}\n\n`
-      );
-      res.end();
+      ws.send(JSON.stringify({ 
+        type: "error", 
+        error: "Error during AI response generation" 
+      }));
     }
   } catch (error) {
     console.error("askQuestion error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    ws.send(JSON.stringify({ 
+      type: "error", 
+      error: "Internal server error" 
+    }));
   }
 };

@@ -2,6 +2,9 @@
 
 This backend allows users to upload YouTube video URLs, fetches and stores video metadata and transcripts, generates embeddings for transcript chunks, and enables users to ask questions about the video content using semantic search and Gemini AI.
 
+## NOTES FOR WORK
+- 
+
 ## Features
 - Upload YouTube video URLs and store metadata, transcript, and summary
 - Chunk and embed transcripts for semantic search

@@ -20,11 +20,13 @@
   "dependencies": {
     "@google/genai": "^0.13.0",
     "@types/dotenv": "^6.1.1",
+    "@types/ws": "^8.18.1",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.43.1",
     "express": "^5.1.0",
     "pg": "^8.15.6",
+    "ws": "^8.18.2",
     "youtube-transcript": "^1.2.1"
   },
   "devDependencies": {

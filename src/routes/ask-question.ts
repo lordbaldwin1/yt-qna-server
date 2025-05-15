@@ -1,8 +1,8 @@
-import { Router } from "express";
-import { askQuestion } from "../controllers/askQuestionController";
+// import { Router } from "express";
+// import { askQuestion } from "../controllers/askQuestionController";
 
-const router = Router();
+// const router = Router();
 
-router.post("/", askQuestion);
+// router.post("/", askQuestion);
 
-export default router;
+// export default router;

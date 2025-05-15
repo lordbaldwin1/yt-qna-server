@@ -8,6 +8,7 @@ export const videosTable = pgTable("videos", {
   title: varchar({ length: 255 }).notNull(),
   description: text().notNull(),
   url: text().notNull(),
+  embedUrl: text().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
