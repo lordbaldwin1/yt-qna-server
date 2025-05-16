@@ -27,22 +27,10 @@ wss.on("connection", (ws) => {
 
   ws.send(JSON.stringify({ type: "connection", message: "Welcome to the server" }));
 
-  ws.on("message", (message) => {
+  ws.on("message", (event) => {
     try {
-      const parsedMessage = JSON.parse(message.toString());
-      console.log("Received message:", parsedMessage);
-
-      // Handle different message types
-      switch (parsedMessage.type) {
-        case "ask_question":
-          handleAskQuestionWS(ws, parsedMessage);
-          break;
-        default:
-          ws.send(JSON.stringify({ 
-            type: "error", 
-            message: "Unknown message type" 
-          }));
-      }
+      const parsedEvent = JSON.parse(event.toString());
+      handleAskQuestionWS(ws, parsedEvent.question, parsedEvent.videoId);
     } catch (error) {
       console.error("Error parsing message:", error);
       ws.send(JSON.stringify({ type: "error", message: "Invalid message format" }));

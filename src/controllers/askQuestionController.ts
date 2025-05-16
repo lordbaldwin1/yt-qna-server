@@ -10,10 +10,9 @@ import { db } from "../db";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
+export const handleAskQuestionWS = async (ws: WebSocket, question: string, videoId: string) => {
   try {
-    const { question, videoId } = message;
-
+    console.log(question, videoId);
     if (!question || !videoId) {
       ws.send(JSON.stringify({ 
         type: "error", 
@@ -109,7 +108,6 @@ export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
     let fullAnswer = "";
 
     try {
-      // Send a message indicating the AI is processing
       ws.send(JSON.stringify({ 
         type: "processing",
         message: "Processing your question..."
@@ -126,7 +124,7 @@ export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
           fullAnswer += text;
           ws.send(JSON.stringify({ 
             type: "chunk", 
-            text,
+            message:text,
             timestamp: new Date().toISOString()
           }));
         }
