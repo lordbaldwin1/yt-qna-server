@@ -1,4 +1,5 @@
 import { integer, pgTable, varchar, timestamp, text, vector, doublePrecision, index } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 
 export const videosTable = pgTable("videos", {
@@ -35,3 +36,14 @@ export const questionsTable = pgTable("questions", {
 }, (t) => [
   index("answerEmbeddingIndex").using("hnsw", t.answerEmbedding.op("vector_cosine_ops"))
 ]);
+
+export const videosRelations = relations(videosTable, ({ many }) => ({
+  transcriptChunks: many(transcriptChunksTable),
+}));
+
+export const transcriptChunksRelations = relations(transcriptChunksTable, ({ one }) => ({
+  video: one(videosTable, {
+    fields: [transcriptChunksTable.videoId],
+    references: [videosTable.id],
+  }),
+}));

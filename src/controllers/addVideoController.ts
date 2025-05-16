@@ -13,8 +13,7 @@ export const addVideo = async (req: Request, res: Response) => {
 
   if (!videoUrl) {
     const response: ApiResponse<null> = {
-      success: false,
-      error: "URL is required"
+      message: "URL is required"
     };
     return res.status(400).json(response);
   }
@@ -23,8 +22,7 @@ export const addVideo = async (req: Request, res: Response) => {
   
   if (!videoId) {
     const response: ApiResponse<null> = {
-      success: false,
-      error: "Invalid YouTube URL"
+      message: "Invalid YouTube URL"
     };
     return res.status(400).json(response);
   }
@@ -35,8 +33,7 @@ export const addVideo = async (req: Request, res: Response) => {
 
   if (duplicateVideo) {
     const response: ApiResponse<null> = {
-      success: false,
-      error: "Video already exists"
+      message: "Video already exists"
     };
     return res.status(400).json(response);
   }
@@ -47,9 +44,7 @@ export const addVideo = async (req: Request, res: Response) => {
     
     if (!data.items || data.items.length === 0) {
       const errorResponse: ApiResponse<null> = {
-        success: false,
-        error: "Video not found on YouTube",
-        code: "VIDEO_NOT_FOUND"
+        message: "Video not found on YouTube"
       };
       return res.status(404).json(errorResponse);
     }
@@ -74,25 +69,20 @@ export const addVideo = async (req: Request, res: Response) => {
 
     if (video) {
       const successResponse: ApiResponse<Video> = {
-        success: true,
         message: "Video added successfully",
         data: video[0] as Video
       };
       return res.status(200).json(successResponse);
     } else {
       const errorResponse: ApiResponse<null> = {
-        success: false,
-        error: "Failed to add video",
-        code: "INTERNAL_ERROR"
+        message: "Failed to add video"
       };
       return res.status(400).json(errorResponse);
     }
   } catch (error) {
     console.error(error);
     const errorResponse: ApiResponse<null> = {
-      success: false,
-      error: "Failed to fetch video data",
-      code: "INTERNAL_ERROR"
+      message: "Failed to fetch video data"
     };
     return res.status(500).json(errorResponse);
   }

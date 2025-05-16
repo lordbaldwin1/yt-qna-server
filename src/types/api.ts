@@ -5,11 +5,8 @@ export interface AddVideoRequest {
 
 // API Response Types
 export interface ApiResponse<T> {
-  success: boolean;
   message?: string;
   data?: T;
-  error?: string;
-  code?: string;
 }
 
 export interface Video {

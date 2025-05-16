@@ -5,25 +5,10 @@ import { cosineDistance, sql, gt, desc, eq, and } from "drizzle-orm";
 import {
   questionsTable,
   transcriptChunksTable,
-  videosTable,
 } from "../db/schema";
 import { db } from "../db";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-async function getEmbedding(text: string) {
-  const response = await ai.models.embedContent({
-    model: "text-embedding-004",
-    contents: [text],
-    config: { taskType: "SEMANTIC_SIMILARITY" },
-  });
-
-  if (!response.embeddings || !response.embeddings[0].values) {
-    throw new Error("No embeddings returned");
-  }
-
-  return response.embeddings[0].values;
-}
 
 export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
   try {
@@ -178,3 +163,17 @@ export const handleAskQuestionWS = async (ws: WebSocket, message: any) => {
     }));
   }
 };
+
+async function getEmbedding(text: string) {
+  const response = await ai.models.embedContent({
+    model: "text-embedding-004",
+    contents: [text],
+    config: { taskType: "SEMANTIC_SIMILARITY" },
+  });
+
+  if (!response.embeddings || !response.embeddings[0].values) {
+    throw new Error("No embeddings returned");
+  }
+
+  return response.embeddings[0].values;
+}
