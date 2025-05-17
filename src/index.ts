@@ -23,8 +23,6 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
-  console.log("Client connected");
-
   ws.send(JSON.stringify({ type: "connection", message: "Welcome to the server" }));
 
   ws.on("message", (event) => {

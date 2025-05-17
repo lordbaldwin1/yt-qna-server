@@ -12,7 +12,6 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const handleAskQuestionWS = async (ws: WebSocket, question: string, videoId: string) => {
   try {
-    console.log(question, videoId);
     if (!question || !videoId) {
       ws.send(JSON.stringify({ 
         type: "error", 
@@ -20,7 +19,6 @@ export const handleAskQuestionWS = async (ws: WebSocket, question: string, video
       }));
       return;
     }
-
     const numericVideoId = Number(videoId);
     if (isNaN(numericVideoId)) {
       ws.send(JSON.stringify({ 
@@ -96,6 +94,7 @@ export const handleAskQuestionWS = async (ws: WebSocket, question: string, video
         : "";
 
     const mostRelevantTimestamp = similarChunks[0]?.startTime ?? 0;
+    console.log(mostRelevantTimestamp);
     const prompt = `
       Here is context of the video:
       ${context}
